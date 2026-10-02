@@ -925,8 +925,16 @@ if [[ -n $v4 && -n $v6 ]]; then
 green "调整IPv4/IPV6配置输出"
 yellow "1：刷新本地IP，使用IPV4配置输出 (回车默认) "
 yellow "2：刷新本地IP，使用IPV6配置输出"
-readp "请选择【1-2】：" menu
+yellow "3：同时输出IPV4与IPV6双栈节点"
+readp "请选择【1-3】：" menu
+rm -rf /etc/s-box/dual.log
 if [ -z "$menu" ] || [ "$menu" = "1" ]; then
+server_ip="$v4"
+echo "$server_ip" > /etc/s-box/server_ip.log
+server_ipcl="$v4"
+echo "$server_ipcl" > /etc/s-box/server_ipcl.log
+elif [ "$menu" = "3" ]; then
+echo "1" > /etc/s-box/dual.log
 server_ip="$v4"
 echo "$server_ip" > /etc/s-box/server_ip.log
 server_ipcl="$v4"
@@ -938,6 +946,7 @@ server_ipcl="$v6"
 echo "$server_ipcl" > /etc/s-box/server_ipcl.log
 fi
 else
+rm -rf /etc/s-box/dual.log
 yellow "VPS并不是双栈VPS，不支持IP配置输出的切换"
 serip=$(curl -s4m5 icanhazip.com -k || curl -s6m5 icanhazip.com -k)
 if [[ "$serip" =~ : ]]; then
@@ -3944,11 +3953,49 @@ red "未正常启动Sing-box，请卸载重装或者选择10查看运行日志�
 fi
 }
 
-sbshare(){
-rm -rf /etc/s-box/{jhdy,vl_reality,vm_ws_argols,vm_ws_argogd,vm_ws,vm_ws_tls,hy2,tuic5,an}.txt
+sbgenonce(){
 result_vl_vm_hy_tu && resvless && resvmess && reshy2 && restu5
 if [[ "$sbnh" != "1.10" ]]; then
 resan
+fi
+}
+sbsave(){
+for sbf in vl_reality vm_ws_argols vm_ws_argogd vm_ws vm_ws_tls hy2 tuic5 an; do
+cp /etc/s-box/$sbf.txt /etc/s-box/$sbf.$1.txt 2>/dev/null
+done
+}
+sbsetip(){
+if [ "$1" = "v6" ]; then
+server_ip="[$v6]"
+echo "$server_ip" > /etc/s-box/server_ip.log
+server_ipcl="$v6"
+echo "$server_ipcl" > /etc/s-box/server_ipcl.log
+else
+server_ip="$v4"
+echo "$server_ip" > /etc/s-box/server_ip.log
+server_ipcl="$v4"
+echo "$server_ipcl" > /etc/s-box/server_ipcl.log
+fi
+}
+sbshare(){
+rm -rf /etc/s-box/{jhdy,vl_reality,vm_ws_argols,vm_ws_argogd,vm_ws,vm_ws_tls,hy2,tuic5,an}.txt
+rm -rf /etc/s-box/{vl_reality,vm_ws_argols,vm_ws_argogd,vm_ws,vm_ws_tls,hy2,tuic5,an}.v4.txt
+rm -rf /etc/s-box/{vl_reality,vm_ws_argols,vm_ws_argogd,vm_ws,vm_ws_tls,hy2,tuic5,an}.v6.txt
+if [[ -f /etc/s-box/dual.log && -n $v4 && -n $v6 ]]; then
+sbsetip v4
+sbgenonce
+sbsave v4
+sbsetip v6
+sbgenonce
+sbsave v6
+for sbf in vl_reality vm_ws_argols vm_ws_argogd vm_ws vm_ws_tls hy2 tuic5 an; do
+if [[ -f /etc/s-box/$sbf.v4.txt || -f /etc/s-box/$sbf.v6.txt ]]; then
+cat /etc/s-box/$sbf.v4.txt /etc/s-box/$sbf.v6.txt 2>/dev/null | awk '!seen[$0]++' > /etc/s-box/$sbf.txt
+fi
+done
+sbsetip v4
+else
+sbgenonce
 fi
 cat /etc/s-box/vl_reality.txt 2>/dev/null >> /etc/s-box/jhdy.txt
 cat /etc/s-box/vm_ws_argols.txt 2>/dev/null >> /etc/s-box/jhdy.txt
