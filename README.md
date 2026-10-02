@@ -47,18 +47,6 @@ bash <(wget -qO- https://raw.githubusercontent.com/zwjttztt/sing-box-yg/main/sb.
 bash <(curl -Ls https://raw.githubusercontent.com/zwjttztt/sing-box-yg/main/sb.sh)
 ```
 
-### 私有仓库安装方式（本仓库已设为私有，上面的直链需要令牌才能访问）
-
-在 https://github.com/settings/personal-access-tokens 生成令牌后（Repository access 选本仓库、Permissions 里 Contents 设为 Read-only），用下面任一命令安装：
-
-```
-bash <(curl -Ls -H "Authorization: token 你的令牌" https://raw.githubusercontent.com/zwjttztt/sing-box-yg/main/sb.sh)
-```
-或者
-```
-bash <(wget -qO- --header="Authorization: token 你的令牌" https://raw.githubusercontent.com/zwjttztt/sing-box-yg/main/sb.sh)
-```
-
 一键快捷命令现实本地IP订阅：`printf '3\n8\n1\n订阅密码' | sb`
 
 一键快捷命令现实Argo临时隧道：`printf '3\n3\n1\n1' | sb`
