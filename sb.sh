@@ -2918,30 +2918,61 @@ fi
 }
 
 changeip(){
-if [[ "$sbnh" == "1.10" ]]; then
+sbactive
 v4v6
-chip(){
-rpip=$(sed 's://.*::g' /etc/s-box/sb.json | jq -r '.outbounds[0].domain_strategy')
-sed -i "111s/$rpip/$rrpip/g" /etc/s-box/sb10.json
-cp /etc/s-box/sb10.json /etc/s-box/sb.json
+while :; do
+v6need=""; v4need=""; dnsv6=""
+echo
+green "出站协议栈设置（入站维持双栈，节点地址请在菜单15切换）"
+yellow "当前VPS地址：IPV4=${v4:-无}   IPV6=${v6:-无}"
+blue "当前出站策略：$(sed 's://.*::g' /etc/s-box/sb.json | jq -r '.outbounds[0].domain_strategy // "未设置"')"
+yellow "1. 默认：IPV4优先 (回车默认)"
+yellow "2. IPV6优先：有AAAA走IPV6，无则回退IPV4 (推荐，不会断网)"
+yellow "3. 仅IPV6：强制IPV6出站 (无AAAA记录的站点会不可达)"
+yellow "4. 仅IPV4：强制IPV4出站"
+readp "请选择【1-4】：" choose
+case "$choose" in
+2) rrpip="prefer_ipv6"; v6need="y"; v4_6="IPV6优先($v6)";;
+3) rrpip="ipv6_only"; v6need="y"; dnsv6="y"; v4_6="仅IPV6($v6)";;
+4) rrpip="ipv4_only"; v4need="y"; v4_6="仅IPV4($v4)";;
+*) rrpip="prefer_ipv4"; v4need="y"; v4_6="IPV4优先($v4)";;
+esac
+if [[ "$v6need" = "y" && -z $v6 ]]; then
+red "当前VPS没有可用的IPV6出站地址，无法切换到IPV6出站" && continue
+fi
+if [[ "$v4need" = "y" && -z $v4 ]]; then
+red "当前VPS没有可用的IPV4出站地址，无法切换到IPV4出站" && continue
+fi
+break
+done
+if [[ "$dnsv6" = "y" ]]; then
+for sbf in $sbfiles; do
+if [[ -f $sbf && ! -f $sbf.dnsbak ]]; then
+cp $sbf $sbf.dnsbak
+fi
+done
+fi
+for sbf in $sbfiles; do
+if [[ -f $sbf ]]; then
+jq --arg s "$rrpip" '.outbounds[0].domain_strategy=$s' $sbf > /tmp/sbip.json 2>/dev/null && mv /tmp/sbip.json $sbf
+if [[ "$dnsv6" = "y" ]]; then
+jq '(.dns.rules[]? | select(.strategy=="prefer_ipv4") | .strategy) = "prefer_ipv6"' $sbf > /tmp/sbip.json 2>/dev/null && mv /tmp/sbip.json $sbf
+fi
+fi
+done
+if [[ "$dnsv6" != "y" ]]; then
+for sbf in $sbfiles; do
+if [[ -f $sbf.dnsbak ]]; then
+cp $sbf.dnsbak $sbf
+rm -rf $sbf.dnsbak
+jq --arg s "$rrpip" '.outbounds[0].domain_strategy=$s' $sbf > /tmp/sbip.json 2>/dev/null && mv /tmp/sbip.json $sbf
+fi
+done
+fi
 restartsb
-}
-readp "1. IPV4优先\n2. IPV6优先\n3. 仅IPV4\n4. 仅IPV6\n请选择：" choose
-if [[ $choose == "1" && -n $v4 ]]; then
-rrpip="prefer_ipv4" && chip && v4_6="IPV4优先($v4)"
-elif [[ $choose == "2" && -n $v6 ]]; then
-rrpip="prefer_ipv6" && chip && v4_6="IPV6优先($v6)"
-elif [[ $choose == "3" && -n $v4 ]]; then
-rrpip="ipv4_only" && chip && v4_6="仅IPV4($v4)"
-elif [[ $choose == "4" && -n $v6 ]]; then
-rrpip="ipv6_only" && chip && v4_6="仅IPV6($v6)"
-else 
-red "当前不存在你选择的IPV4/IPV6地址，或者输入错误" && changeip
-fi
-blue "当前已更换的IP优先级：${v4_6}" && sb
-else
-red "仅支持1.10.7内核可用" && exit
-fi
+blue "当前出站协议栈：${rrpip} —— ${v4_6}"
+blue "入站仍为双栈：客户端用IPV4连入 + VPS用IPV6出站的搭配已生效"
+changeserv
 }
 
 tgsbshow(){
@@ -3075,7 +3106,7 @@ changeserv(){
 sbactive
 echo
 green "Sing-box配置变更选择如下:"
-readp "1：更换Reality域名伪装地址、切换自签证书与Acme域名证书、开关TLS\n2：更换全协议UUID(密码)、Vmess-Path路径\n3：设置Argo临时隧道、固定隧道\n4：切换IPV4或IPV6的代理优先级 (仅 1.10.7 内核可用)\n5：设置Telegram推送节点通知\n6：更换Warp-wireguard出站账户\n7：设置Gitlab订阅分享链接\n8：设置本地IP订阅分享链接\n9：设置所有Vmess节点的CDN优选地址\n0：返回上层\n请选择【0-9】：" menu
+readp "1：更换Reality域名伪装地址、切换自签证书与Acme域名证书、开关TLS\n2：更换全协议UUID(密码)、Vmess-Path路径\n3：设置Argo临时隧道、固定隧道\n4：切换出站IPV4/IPV6协议栈 (IPV4入站+IPV6出站，全内核可用)\n5：设置Telegram推送节点通知\n6：更换Warp-wireguard出站账户\n7：设置Gitlab订阅分享链接\n8：设置本地IP订阅分享链接\n9：设置所有Vmess节点的CDN优选地址\n0：返回上层\n请选择【0-9】：" menu
 if [ "$menu" = "1" ];then
 changeym
 elif [ "$menu" = "2" ];then
